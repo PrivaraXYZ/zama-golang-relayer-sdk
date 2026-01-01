@@ -1,0 +1,42 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+      - id: end-of-file-fixer
+        name: Ensure files end with newline
+      - id: check-yaml
+        name: Check YAML syntax
+      - id: check-added-large-files
+        name: Prevent large files (>500KB)
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: mixed-line-ending
+        name: Ensure consistent line endings
+
+  - repo: https://github.com/dnephin/pre-commit-golang
+    rev: v0.5.1
+    hooks:
+      - id: go-fmt
+        name: Run gofmt
+        args: [-w]
+
+      - id: go-imports
+        name: Run goimports
+        args: [-w]
+
+      - id: go-mod-tidy
+        name: Run go mod tidy
+
+      - id: go-build
+        name: Build Go code
+        pass_filenames: false
+
+  - repo: https://github.com/golangci/golangci-lint
+    rev: v1.55.2
+    hooks:
+      - id: golangci-lint
+        name: Run golangci-lint
+        args: [--config=.golangci.yml]
