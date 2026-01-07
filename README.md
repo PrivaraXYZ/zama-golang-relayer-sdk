@@ -30,18 +30,39 @@ import (
 func main() {
     ctx := context.Background()
 
-    instance, err := relayer.CreateInstance(ctx, relayer.SepoliaConfig)
+    // Get Sepolia configuration
+    config, err := relayer.SepoliaConfig()
     if err != nil {
         log.Fatal(err)
     }
 
-    input := instance.CreateEncryptedInput(
+    // Create FHEVM instance
+    instance, err := relayer.CreateInstance(ctx, config)
+    if err != nil {
+        log.Fatal(err)
+    }
+
+    // Create encrypted input (validates addresses at creation)
+    input, err := instance.CreateEncryptedInput(
         "0xContractAddress...",
         "0xUserAddress...",
     )
+    if err != nil {
+        log.Fatal(err)
+    }
 
-    input.Add64(big.NewInt(12345)).AddBool(true)
+    // Add values (type-safe, no errors)
+    input.AddUint64(12345)
+    input.AddBool(true)
 
+    // For addresses, create Address value object first
+    addr, err := relayer.NewAddress("0xRecipient...")
+    if err != nil {
+        log.Fatal(err)
+    }
+    input.AddAddress(addr)
+
+    // Encrypt all values
     result, err := input.Encrypt(ctx)
     if err != nil {
         log.Fatal(err)
@@ -103,20 +124,63 @@ sequenceDiagram
 
 ## API
 
+### Configuration
+
+```go
+// 1. Sepolia testnet with defaults
+config, err := relayer.SepoliaConfig()
+
+// 2. Sepolia with custom options
+config, err := relayer.SepoliaConfig(
+    relayer.WithTimeout(60 * time.Second),
+    relayer.WithMaxRetries(5),
+    relayer.WithCustomRelayerURL("https://my-relayer.com"),
+)
+
+// 3. Custom network
+config, err := relayer.NewCustomConfig(
+    chainID,
+    gatewayChainID,
+    relayerURL,
+    networkURL,
+    relayer.WithTimeout(45 * time.Second),
+)
+```
+
 ### CreateInstance
 
 ```go
-instance, err := relayer.CreateInstance(ctx, relayer.SepoliaConfig)
+config, err := relayer.SepoliaConfig()
+instance, err := relayer.CreateInstance(ctx, config)
 ```
 
-### EncryptedInput Builder
+### Available Options
+
+| Option | Description |
+|--------|-------------|
+| `WithTimeout(duration)` | Set HTTP request timeout |
+| `WithMaxRetries(n)` | Set maximum retry attempts |
+| `WithCustomRelayerURL(url)` | Override relayer URL |
+| `WithCustomNetworkURL(url)` | Override network RPC URL |
+| `WithAuth(credentials)` | Set authentication |
+
+### EncryptedInput Entity
 
 | Method | Description |
 |--------|-------------|
-| `Add64(value *big.Int)` | Add uint64 value |
-| `AddBool(value bool)` | Add boolean value |
-| `AddAddress(addr string)` | Add Ethereum address |
-| `Encrypt(ctx)` | Execute encryption |
+| `AddUint64(value uint64)` | Add uint64 value (type-safe, no errors) |
+| `AddBool(value bool)` | Add boolean value (type-safe, no errors) |
+| `AddAddress(addr Address)` | Add validated Address value object |
+| `Encrypt(ctx) (*EncryptResult, error)` | Execute encryption |
+
+### Address Value Object
+
+| Function | Description |
+|----------|-------------|
+| `NewAddress(addr string) (Address, error)` | Create validated Address |
+| `String() string` | Get string representation |
+| `Bytes() ([]byte, error)` | Convert to bytes |
+| `Equals(other Address) bool` | Check equality |
 
 ### EncryptResult
 
