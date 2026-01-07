@@ -235,11 +235,27 @@ func WithVerifyingContractInputVerification(address string) Option {
 // Returns a new instance each time to ensure immutability.
 func SepoliaConfig(opts ...Option) (*FhevmInstanceConfig, error) {
 	// Create validated Address value objects
-	aclAddr, _ := NewAddress("0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D")
-	kmsAddr, _ := NewAddress("0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A")
-	verifierAddr, _ := NewAddress("0xBBC1fFCdc7C316aAAd72E807D9b0272BE8F84DA0")
-	decryptionAddr, _ := NewAddress("0x5D8BD78e2ea6bbE41f26dFe9fdaEAa349e077478")
-	inputVerificationAddr, _ := NewAddress("0x483b9dE06E4E4C7D35CCf5837A1668487406D955")
+	// These addresses are hardcoded and should always be valid
+	aclAddr, err := NewAddress("0xf0Ffdc93b7E186bC2f8CB3dAA75D86d1930A433D")
+	if err != nil {
+		return nil, fmt.Errorf("invalid ACL contract address: %w", err)
+	}
+	kmsAddr, err := NewAddress("0xbE0E383937d564D7FF0BC3b46c51f0bF8d5C311A")
+	if err != nil {
+		return nil, fmt.Errorf("invalid KMS contract address: %w", err)
+	}
+	verifierAddr, err := NewAddress("0xBBC1fFCdc7C316aAAd72E807D9b0272BE8F84DA0")
+	if err != nil {
+		return nil, fmt.Errorf("invalid input verifier contract address: %w", err)
+	}
+	decryptionAddr, err := NewAddress("0x5D8BD78e2ea6bbE41f26dFe9fdaEAa349e077478")
+	if err != nil {
+		return nil, fmt.Errorf("invalid decryption contract address: %w", err)
+	}
+	inputVerificationAddr, err := NewAddress("0x483b9dE06E4E4C7D35CCf5837A1668487406D955")
+	if err != nil {
+		return nil, fmt.Errorf("invalid input verification contract address: %w", err)
+	}
 
 	cfg := &FhevmInstanceConfig{
 		chainID:                            11155111,

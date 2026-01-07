@@ -45,13 +45,18 @@ func (e *EncryptedInput) AddBool(value bool) {
 // AddAddress adds an Ethereum address to encrypt.
 // This is a domain operation that updates the entity state.
 // Accepts a validated Address value object, ensuring correctness.
-func (e *EncryptedInput) AddAddress(address Address) {
-	addrBytes, _ := address.Bytes()
+// Returns error if address cannot be converted to bytes (should never happen for valid Address).
+func (e *EncryptedInput) AddAddress(address Address) error {
+	addrBytes, err := address.Bytes()
+	if err != nil {
+		return fmt.Errorf("failed to convert address to bytes: %w", err)
+	}
 
 	e.values = append(e.values, encryptedValue{
 		valueType: typeAddress,
 		data:      addrBytes,
 	})
+	return nil
 }
 
 // Encrypt performs FHE encryption and returns handles + proof.

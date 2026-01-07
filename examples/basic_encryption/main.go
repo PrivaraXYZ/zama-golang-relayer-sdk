@@ -74,7 +74,7 @@ func main() {
 	fmt.Println("  if err != nil {")
 	fmt.Println("      log.Fatal(err)")
 	fmt.Println("  }")
-	fmt.Println("  input.AddAddress(addr)    // No error - Address is validated")
+	fmt.Println("  input.AddAddress(addr)    // Returns error if conversion fails")
 	fmt.Println()
 	fmt.Println("  // Perform encryption")
 	fmt.Println("  result, err := input.Encrypt(ctx)")

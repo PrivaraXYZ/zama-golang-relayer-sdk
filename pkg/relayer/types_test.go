@@ -7,8 +7,14 @@ import (
 )
 
 func TestEncryptedInput_DomainOperations(t *testing.T) {
-	contractAddr, _ := NewAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5")
-	userAddr, _ := NewAddress("0x1234567890123456789012345678901234567890")
+	contractAddr, err := NewAddress("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb5")
+	if err != nil {
+		t.Fatalf("Failed to create contract address: %v", err)
+	}
+	userAddr, err := NewAddress("0x1234567890123456789012345678901234567890")
+	if err != nil {
+		t.Fatalf("Failed to create user address: %v", err)
+	}
 
 	input := &EncryptedInput{
 		contractAddress: contractAddr,
@@ -19,8 +25,13 @@ func TestEncryptedInput_DomainOperations(t *testing.T) {
 	input.AddUint64(123)
 	input.AddBool(true)
 
-	addr, _ := NewAddress("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
-	input.AddAddress(addr)
+	addr, err := NewAddress("0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045")
+	if err != nil {
+		t.Fatalf("Failed to create address: %v", err)
+	}
+	if err := input.AddAddress(addr); err != nil {
+		t.Fatalf("Failed to add address: %v", err)
+	}
 
 	if input.Count() != 3 {
 		t.Errorf("Expected 3 values, got %d", input.Count())
@@ -69,7 +80,9 @@ func TestEncryptedInput_AddAddress(t *testing.T) {
 		t.Fatalf("Failed to create address: %v", err)
 	}
 
-	input.AddAddress(addr)
+	if err := input.AddAddress(addr); err != nil {
+		t.Fatalf("Failed to add address: %v", err)
+	}
 	if input.Count() != 1 {
 		t.Errorf("Expected 1 value, got %d", input.Count())
 	}
