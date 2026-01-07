@@ -4,9 +4,8 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
-	"math/big"
 
-	"github.com/PrivaraXYZ/zama-golang-relayer-sdk/internal/utils"
+	sdkerrors "github.com/PrivaraXYZ/zama-golang-relayer-sdk/pkg/errors"
 )
 
 const (
@@ -15,34 +14,23 @@ const (
 	typeAddress = "address"
 )
 
-// Add64 adds a uint64 value to encrypt.
-func (e *EncryptedInput) Add64(value *big.Int) *EncryptedInput {
-	if value == nil {
-		value = big.NewInt(0)
-	}
-
-	if value.Sign() < 0 {
-		return e
-	}
-
-	maxUint64 := new(big.Int).SetUint64(^uint64(0))
-	if value.Cmp(maxUint64) > 0 {
-		return e
-	}
-
+// AddUint64 adds a uint64 value to encrypt.
+// This is a domain operation that updates the entity state.
+// The value is guaranteed to be valid by the type system.
+func (e *EncryptedInput) AddUint64(value uint64) {
 	data := make([]byte, 8)
-	binary.BigEndian.PutUint64(data, value.Uint64())
+	binary.BigEndian.PutUint64(data, value)
 
 	e.values = append(e.values, encryptedValue{
 		valueType: typeUint64,
 		data:      data,
 	})
-
-	return e
 }
 
 // AddBool adds a boolean value to encrypt.
-func (e *EncryptedInput) AddBool(value bool) *EncryptedInput {
+// This is a domain operation that updates the entity state.
+// The value is guaranteed to be valid by the type system.
+func (e *EncryptedInput) AddBool(value bool) {
 	var data byte
 	if value {
 		data = 1
@@ -52,41 +40,25 @@ func (e *EncryptedInput) AddBool(value bool) *EncryptedInput {
 		valueType: typeBool,
 		data:      []byte{data},
 	})
-
-	return e
 }
 
 // AddAddress adds an Ethereum address to encrypt.
-func (e *EncryptedInput) AddAddress(address string) *EncryptedInput {
-	if !utils.IsValidAddress(address) {
-		return e
-	}
-
-	addrBytes, err := utils.AddressToBytes(address)
-	if err != nil {
-		return e
-	}
+// This is a domain operation that updates the entity state.
+// Accepts a validated Address value object, ensuring correctness.
+func (e *EncryptedInput) AddAddress(address Address) {
+	addrBytes, _ := address.Bytes()
 
 	e.values = append(e.values, encryptedValue{
 		valueType: typeAddress,
 		data:      addrBytes,
 	})
-
-	return e
 }
 
 // Encrypt performs FHE encryption and returns handles + proof.
+// The entity is always in a valid state, so no address validation is needed.
 func (e *EncryptedInput) Encrypt(ctx context.Context) (*EncryptResult, error) {
 	if len(e.values) == 0 {
-		return nil, fmt.Errorf("no values to encrypt")
-	}
-
-	if !utils.IsValidAddress(e.contractAddress) {
-		return nil, fmt.Errorf("invalid contract address: %s", e.contractAddress)
-	}
-
-	if !utils.IsValidAddress(e.userAddress) {
-		return nil, fmt.Errorf("invalid user address: %s", e.userAddress)
+		return nil, sdkerrors.ErrNoValues
 	}
 
 	return e.performEncryption(ctx)
@@ -103,17 +75,26 @@ func (e *EncryptedInput) Count() int {
 	return len(e.values)
 }
 
-func (e *EncryptedInput) performEncryption(_ context.Context) (*EncryptResult, error) {
+func (e *EncryptedInput) performEncryption(ctx context.Context) (*EncryptResult, error) {
 	handles := make([][]byte, len(e.values))
 	for i, val := range e.values {
-		handle, err := e.encryptValue(val)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		handle, err := e.encryptValue(ctx, val)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encrypt value %d: %w", i, err)
 		}
 		handles[i] = handle
 	}
 
-	inputProof := e.generateInputProof(handles)
+	inputProof, err := e.generateInputProof(ctx, handles)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate input proof: %w", err)
+	}
 
 	return &EncryptResult{
 		Handles:    handles,
@@ -121,17 +102,24 @@ func (e *EncryptedInput) performEncryption(_ context.Context) (*EncryptResult, e
 	}, nil
 }
 
-func (e *EncryptedInput) encryptValue(val encryptedValue) ([]byte, error) {
-	data, ok := val.data.([]byte)
-	if !ok {
-		return nil, fmt.Errorf("invalid value data type")
+func (e *EncryptedInput) encryptValue(ctx context.Context, val encryptedValue) ([]byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
 	}
 
-	handle := generateMockHandle(val.valueType, data)
+	handle := generateMockHandle(val.valueType, val.data)
 	return handle, nil
 }
 
-func (e *EncryptedInput) generateInputProof(handles [][]byte) []byte {
+func (e *EncryptedInput) generateInputProof(ctx context.Context, handles [][]byte) ([]byte, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	default:
+	}
+
 	return generateMockProof(e.contractAddress, e.userAddress, handles)
 }
 
@@ -151,19 +139,21 @@ func generateMockHandle(valueType string, data []byte) []byte {
 	return handle
 }
 
-func generateMockProof(contractAddr, userAddr string, handles [][]byte) []byte {
+func generateMockProof(contractAddr, userAddr Address, handles [][]byte) ([]byte, error) {
 	proofSize := 64 + len(handles)*32
 	proof := make([]byte, proofSize)
 
-	contractBytes, err := utils.AddressToBytes(contractAddr)
-	if err == nil {
-		copy(proof[0:20], contractBytes)
+	contractBytes, err := contractAddr.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert contract address: %w", err)
 	}
+	copy(proof[0:20], contractBytes)
 
-	userBytes, err := utils.AddressToBytes(userAddr)
-	if err == nil {
-		copy(proof[20:40], userBytes)
+	userBytes, err := userAddr.Bytes()
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert user address: %w", err)
 	}
+	copy(proof[20:40], userBytes)
 
 	proof[40] = byte(len(handles))
 
@@ -173,5 +163,5 @@ func generateMockProof(contractAddr, userAddr string, handles [][]byte) []byte {
 		offset += 32
 	}
 
-	return proof
+	return proof, nil
 }
