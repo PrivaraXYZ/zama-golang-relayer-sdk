@@ -14,6 +14,11 @@ func TestErrors(t *testing.T) {
 		{"InvalidAddress", ErrInvalidAddress},
 		{"EncryptionFailed", ErrEncryptionFailed},
 		{"NetworkError", ErrNetworkError},
+		{"InvalidValue", ErrInvalidValue},
+		{"NoValues", ErrNoValues},
+		{"Timeout", ErrTimeout},
+		{"RelayerError", ErrRelayerError},
+		{"NotInitialized", ErrNotInitialized},
 	}
 
 	for _, tt := range tests {
