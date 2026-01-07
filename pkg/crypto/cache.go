@@ -6,6 +6,7 @@ import (
 )
 
 // KeyCache provides thread-safe caching for public keys.
+// KeyCache is safe for concurrent use by multiple goroutines.
 type KeyCache struct {
 	mu      sync.RWMutex
 	keys    map[uint64]cacheEntry

@@ -10,6 +10,7 @@ import (
 )
 
 // PublicKeyManager handles fetching and caching of FHEVM public keys.
+// PublicKeyManager is safe for concurrent use by multiple goroutines.
 type PublicKeyManager struct {
 	client *network.Client
 	cache  *KeyCache
@@ -43,7 +44,7 @@ func (m *PublicKeyManager) GetPublicKey(ctx context.Context, chainID uint64) ([]
 
 	key, err := m.fetchPublicKey(ctx, chainID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to fetch public key for chain %d: %w", chainID, err)
 	}
 
 	m.cache.Set(chainID, key)
@@ -71,4 +72,19 @@ func (m *PublicKeyManager) ClearCache() {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.cache.Clear()
+}
+
+// Close closes the key manager and releases any resources.
+// It clears the cache and closes the underlying client.
+func (m *PublicKeyManager) Close() error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.cache.Clear()
+
+	if m.client != nil {
+		return m.client.Close()
+	}
+
+	return nil
 }

@@ -11,6 +11,7 @@ import (
 )
 
 // Client handles HTTP communication with the Zama relayer.
+// Client is safe for concurrent use by multiple goroutines.
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
@@ -127,4 +128,11 @@ func (c *Client) doRequest(ctx context.Context, method, path string, body []byte
 	}
 
 	return nil, fmt.Errorf("max retries exceeded: %w", lastErr)
+}
+
+// Close closes the client and releases any resources.
+// It closes idle connections in the underlying HTTP client.
+func (c *Client) Close() error {
+	c.httpClient.CloseIdleConnections()
+	return nil
 }
